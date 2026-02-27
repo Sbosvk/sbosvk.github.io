@@ -37,7 +37,9 @@ while IFS=$'\t' read -r src rel_dst; do
   dst_path="$TMP_ROOT/$rel_dst"
 
   if [[ ! -f "$src_path" ]]; then
-    echo "Mapped source is missing: $src" >&2
+    echo "Mapped source is missing: $src (looked in SOURCE_ROOT=$SRC_ROOT)" >&2
+    echo "If running from a separate pages repo, clone the wiki first and run:" >&2
+    echo "  SOURCE_ROOT=<path-to-wiki-repo> ./mkdocs/scripts/sync_wiki_to_mkdocs.sh" >&2
     exit 1
   fi
 
