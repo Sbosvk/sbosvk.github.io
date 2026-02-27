@@ -1,4 +1,4 @@
-# Source wiki file<TAB>destination path under mkdocs/docs
+# Source wiki file<TAB>destination path under mkdocs/docs<TAB>optional nav label override
 Home.md	index.md
 Getting-Started-‐-Presentation-and-features.md	getting-started/presentation-and-features.md
 Getting-Started-‐-Requirements.md	getting-started/requirements.md
