@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 MAP_FILE="$SCRIPT_DIR/wiki_sync_map.tsv"
 NORMALIZER="$SCRIPT_DIR/normalize_wiki_links.pl"
+MKDOCS_GENERATOR="$SCRIPT_DIR/generate_mkdocs_yml.pl"
 
 SRC_ROOT="${SOURCE_ROOT:-$REPO_ROOT}"
 DST_ROOT="${DEST_ROOT:-$REPO_ROOT/mkdocs/docs}"
@@ -22,6 +23,11 @@ fi
 
 if [[ ! -x "$NORMALIZER" ]]; then
   echo "Missing or non-executable normalizer: $NORMALIZER" >&2
+  exit 1
+fi
+
+if [[ ! -x "$MKDOCS_GENERATOR" ]]; then
+  echo "Missing or non-executable MkDocs generator: $MKDOCS_GENERATOR" >&2
   exit 1
 fi
 
@@ -80,6 +86,7 @@ rm -rf "$DST_ROOT"
 mv "$TMP_ROOT" "$DST_ROOT"
 
 "$NORMALIZER"
+"$MKDOCS_GENERATOR"
 
 final_md_count=$(find "$DST_ROOT" -type f -name '*.md' | wc -l | tr -d ' ')
 echo "Synced $mapped_count pages into mkdocs/docs ($final_md_count markdown files after normalization)."
