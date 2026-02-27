@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+MAP_FILE="$SCRIPT_DIR/wiki_sync_map.tsv"
+NORMALIZER="$SCRIPT_DIR/normalize_wiki_links.pl"
+
+SRC_ROOT="${SOURCE_ROOT:-$REPO_ROOT}"
+DST_ROOT="${DEST_ROOT:-$REPO_ROOT/mkdocs/docs}"
+TMP_ROOT="$REPO_ROOT/mkdocs/.docs_tmp"
+
+if [[ ! -d "$SRC_ROOT" ]]; then
+  echo "Missing source root: $SRC_ROOT" >&2
+  exit 1
+fi
+
+if [[ ! -f "$MAP_FILE" ]]; then
+  echo "Missing mapping file: $MAP_FILE" >&2
+  exit 1
+fi
+
+if [[ ! -x "$NORMALIZER" ]]; then
+  echo "Missing or non-executable normalizer: $NORMALIZER" >&2
+  exit 1
+fi
+
+rm -rf "$TMP_ROOT"
+mkdir -p "$TMP_ROOT"
+
+mapped_count=0
+while IFS=$'\t' read -r src rel_dst; do
+  [[ -z "${src// }" ]] && continue
+  [[ "${src:0:1}" == "#" ]] && continue
+
+  src_path="$SRC_ROOT/$src"
+  dst_path="$TMP_ROOT/$rel_dst"
+
+  if [[ ! -f "$src_path" ]]; then
+    echo "Mapped source is missing: $src" >&2
+    exit 1
+  fi
+
+  mkdir -p "$(dirname "$dst_path")"
+  cp "$src_path" "$dst_path"
+  mapped_count=$((mapped_count + 1))
+done < "$MAP_FILE"
+
+# Copy images so old relative image paths continue to work.
+if [[ -d "$SRC_ROOT/images" ]]; then
+  mkdir -p "$TMP_ROOT/images" "$TMP_ROOT/assets/images"
+  cp -R "$SRC_ROOT/images/." "$TMP_ROOT/images/"
+  cp -R "$SRC_ROOT/images/." "$TMP_ROOT/assets/images/"
+fi
+
+# Guardrail: ensure every top-level wiki page is explicitly mapped.
+actual_pages_file="$(mktemp)"
+mapped_pages_file="$(mktemp)"
+
+find "$SRC_ROOT" -maxdepth 1 -type f -name '*.md' \
+  ! -name '_Sidebar.md' \
+  ! -name '_Footer.md' \
+  -printf '%f\n' | sort > "$actual_pages_file"
+
+awk -F'\t' 'NF >= 2 && $1 !~ /^#/ && $1 !~ /^\s*$/ { print $1 }' "$MAP_FILE" | sort > "$mapped_pages_file"
+
+unmapped="$(comm -23 "$actual_pages_file" "$mapped_pages_file" || true)"
+if [[ -n "$unmapped" ]]; then
+  echo "Unmapped wiki markdown files detected:" >&2
+  echo "$unmapped" >&2
+  rm -f "$actual_pages_file" "$mapped_pages_file"
+  exit 1
+fi
+
+rm -f "$actual_pages_file" "$mapped_pages_file"
+
+rm -rf "$DST_ROOT"
+mv "$TMP_ROOT" "$DST_ROOT"
+
+"$NORMALIZER"
+
+final_md_count=$(find "$DST_ROOT" -type f -name '*.md' | wc -l | tr -d ' ')
+echo "Synced $mapped_count pages into mkdocs/docs ($final_md_count markdown files after normalization)."
