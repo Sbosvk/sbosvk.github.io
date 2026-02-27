@@ -1,0 +1,20 @@
+site_name: HLL Community RCON Documentation
+site_description: Documentation for Hell Let Loose Community RCON (CRCON)
+repo_url: https://github.com/MarechJ/hll_rcon_tool
+repo_name: MarechJ/hll_rcon_tool
+edit_uri: ""
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.expand
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+
+markdown_extensions:
+  - admonition
+  - tables
+  - toc:
+      permalink: true
