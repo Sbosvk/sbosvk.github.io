@@ -7,7 +7,7 @@ use File::Spec;
 
 my $repo_root = '.';
 my $docs_root = File::Spec->rel2abs("$repo_root/mkdocs/docs");
-my $map_file  = "$repo_root/mkdocs/scripts/wiki_sync_map.tsv";
+my $map_file  = $ENV{WIKI_SYNC_MAP_FILE} // "$repo_root/mkdocs/scripts/wiki_sync_map.tsv";
 
 die "Missing docs root: $docs_root\n" unless -d $docs_root;
 die "Missing map file: $map_file\n" unless -f $map_file;

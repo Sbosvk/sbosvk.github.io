@@ -4,7 +4,7 @@ use warnings;
 
 my $repo_root = '.';
 my $base_file = "$repo_root/mkdocs/mkdocs.base.yml";
-my $map_file = "$repo_root/mkdocs/scripts/wiki_sync_map.tsv";
+my $map_file = $ENV{WIKI_SYNC_MAP_FILE} // "$repo_root/mkdocs/scripts/wiki_sync_map.tsv";
 my $out_file = "$repo_root/mkdocs/mkdocs.yml";
 
 for my $f ($base_file, $map_file) {

@@ -3,21 +3,27 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-MAP_FILE="$SCRIPT_DIR/wiki_sync_map.tsv"
+MAP_GENERATOR="$SCRIPT_DIR/generate_wiki_sync_map.pl"
 NORMALIZER="$SCRIPT_DIR/normalize_wiki_links.pl"
 MKDOCS_GENERATOR="$SCRIPT_DIR/generate_mkdocs_yml.pl"
 
 SRC_ROOT="${SOURCE_ROOT:-$REPO_ROOT}"
 DST_ROOT="${DEST_ROOT:-$REPO_ROOT/mkdocs/docs}"
 TMP_ROOT="$REPO_ROOT/mkdocs/.docs_tmp"
+MAP_FILE="$(mktemp)"
+
+cleanup() {
+  rm -f "$MAP_FILE"
+}
+trap cleanup EXIT
 
 if [[ ! -d "$SRC_ROOT" ]]; then
   echo "Missing source root: $SRC_ROOT" >&2
   exit 1
 fi
 
-if [[ ! -f "$MAP_FILE" ]]; then
-  echo "Missing mapping file: $MAP_FILE" >&2
+if [[ ! -x "$MAP_GENERATOR" ]]; then
+  echo "Missing or non-executable map generator: $MAP_GENERATOR" >&2
   exit 1
 fi
 
@@ -31,11 +37,22 @@ if [[ ! -x "$MKDOCS_GENERATOR" ]]; then
   exit 1
 fi
 
+"$MAP_GENERATOR" "$SRC_ROOT" "$MAP_FILE"
+
+if [[ ! -f "$MAP_FILE" ]]; then
+  echo "Failed to generate mapping file: $MAP_FILE" >&2
+  exit 1
+fi
+
+echo "===== GENERATED WIKI MAP ====="
+cat "$MAP_FILE"
+echo "===== END GENERATED WIKI MAP ====="
+
 rm -rf "$TMP_ROOT"
 mkdir -p "$TMP_ROOT"
 
 mapped_count=0
-while IFS=$'\t' read -r src rel_dst; do
+while IFS=$'\t' read -r src rel_dst _rest; do
   [[ -z "${src// }" ]] && continue
   [[ "${src:0:1}" == "#" ]] && continue
 
@@ -85,8 +102,8 @@ rm -f "$actual_pages_file" "$mapped_pages_file"
 rm -rf "$DST_ROOT"
 mv "$TMP_ROOT" "$DST_ROOT"
 
-"$NORMALIZER"
-"$MKDOCS_GENERATOR"
+WIKI_SYNC_MAP_FILE="$MAP_FILE" "$NORMALIZER"
+WIKI_SYNC_MAP_FILE="$MAP_FILE" "$MKDOCS_GENERATOR"
 
 final_md_count=$(find "$DST_ROOT" -type f -name '*.md' | wc -l | tr -d ' ')
 echo "Synced $mapped_count pages into mkdocs/docs ($final_md_count markdown files after normalization)."
