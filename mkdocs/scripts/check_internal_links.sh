@@ -3,6 +3,11 @@ set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/../.."
 
+if ! command -v rg >/dev/null 2>&1; then
+  echo "Missing dependency: ripgrep (rg) is required for link checks" >&2
+  exit 2
+fi
+
 failed=0
 
 if rg -nP '\]\((?![a-zA-Z][a-zA-Z0-9+.-]*:|#)[^)]+\.md(?:#[^)]+)?\)' mkdocs/docs; then

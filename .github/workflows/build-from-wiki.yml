@@ -30,6 +30,11 @@ jobs:
         run: |
           pip install -r mkdocs/requirements.txt
 
+      - name: Install ripgrep
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ripgrep
+
       - name: Clone wiki repository
         env:
           WIKI_REPO: ${{ vars.WIKI_SOURCE_REPO }}
@@ -43,10 +48,10 @@ jobs:
         run: |
           SOURCE_ROOT=wiki-src ./mkdocs/scripts/sync_wiki_to_mkdocs.sh
 
-
       - name: Verify internal links are extensionless
         run: |
           ./mkdocs/scripts/check_internal_links.sh
+
       - name: Build site
         run: mkdocs build --strict
         working-directory: mkdocs
