@@ -12,8 +12,16 @@ my $out_file = $ARGV[1] // $default_out;
 
 -d $source_root or die "Missing source root: $source_root\n";
 
+sub strip_order_prefix {
+  my ($s) = @_;
+  return '' unless defined $s;
+  $s =~ s/^\d+_+//;
+  return $s;
+}
+
 sub slugify {
   my ($s) = @_;
+  $s = strip_order_prefix($s);
   $s = lc $s;
   $s =~ s/&/and/g;
   $s =~ s/[^a-z0-9]+/-/g;
@@ -42,10 +50,64 @@ sub classify_additional_setup {
   return 'additional-installs';
 }
 
+sub parse_segment_for_sort {
+  my ($seg) = @_;
+  my ($has_order, $order, $name) = (0, 0, $seg);
+
+  if ($seg =~ /^(\d+)_+(.+)$/) {
+    $has_order = 1;
+    $order = $1 + 0;
+    $name = $2;
+  }
+
+  my $slug = slugify($name);
+  return ($has_order, $order, $slug);
+}
+
+sub cmp_files {
+  my ($file_a, $file_b) = @_;
+
+  my $a_stem = $file_a;
+  $a_stem =~ s/\.md$//;
+  my $b_stem = $file_b;
+  $b_stem =~ s/\.md$//;
+
+  my @a_seg = split_segments($a_stem);
+  my @b_seg = split_segments($b_stem);
+
+  my $max = @a_seg > @b_seg ? scalar(@a_seg) : scalar(@b_seg);
+  for (my $i = 0; $i < $max; $i++) {
+    if ($i >= @a_seg) { return -1; }
+    if ($i >= @b_seg) { return 1; }
+
+    my ($a_has, $a_num, $a_slug) = parse_segment_for_sort($a_seg[$i]);
+    my ($b_has, $b_num, $b_slug) = parse_segment_for_sort($b_seg[$i]);
+
+    # Ordered segments come first, then unordered alphabetically.
+    if ($a_has != $b_has) {
+      return $a_has ? -1 : 1;
+    }
+
+    if ($a_has && $b_has && $a_num != $b_num) {
+      return $a_num <=> $b_num;
+    }
+
+    my $name_cmp = $a_slug cmp $b_slug;
+    return $name_cmp if $name_cmp != 0;
+  }
+
+  # Keep ":-" variants after non-legacy variants when names otherwise tie.
+  my $a_legacy = ($file_a =~ /:-/) ? 1 : 0;
+  my $b_legacy = ($file_b =~ /:-/) ? 1 : 0;
+  if ($a_legacy != $b_legacy) {
+    return $a_legacy <=> $b_legacy;
+  }
+
+  return $file_a cmp $file_b;
+}
+
 opendir my $dh, $source_root or die "Cannot open $source_root: $!\n";
-my @md_files = sort {
-  (($a =~ /:-/) ? 1 : 0) <=> (($b =~ /:-/) ? 1 : 0) || $a cmp $b
-} map { decode('UTF-8', $_) } grep {
+my @md_files = sort { cmp_files($a, $b) } map { decode('UTF-8', $_) } grep {
   /\.md$/ &&
   $_ ne '_Sidebar.md' &&
   $_ ne '_Footer.md' &&
