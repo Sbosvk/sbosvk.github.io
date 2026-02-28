@@ -68,6 +68,35 @@ sub normalize_local_ref {
   return defined($anchor) && length($anchor) ? "$path#$anchor" : $path;
 }
 
+# Turn standalone GitHub user-attachments video URLs into embedded HTML5 video.
+sub embed_video_urls {
+  my ($content) = @_;
+  my @lines = split /\n/, $content, -1;
+  my @out;
+  my $in_fence = 0;
+
+  for my $line (@lines) {
+    if ($line =~ /^\s*```/) {
+      $in_fence = !$in_fence;
+      push @out, $line;
+      next;
+    }
+
+    if (!$in_fence && $line =~ /^\s*(https:\/\/github\.com\/user-attachments\/assets\/[A-Za-z0-9\-]+[^\s<>]*)\s*$/) {
+      my $url = $1;
+      push @out, '<video controls preload="metadata" style="max-width: 100%; height: auto;">';
+      push @out, '  <source src="' . $url . '">';
+      push @out, '  Your browser cannot play this video. <a href="' . $url . '">Open video</a>.';
+      push @out, '</video>';
+      next;
+    }
+
+    push @out, $line;
+  }
+
+  return join("\n", @out);
+}
+
 # Build wiki-slug -> destination map from the authoritative TSV mapping.
 my %slug_to_dest;
 open my $mf, '<:encoding(UTF-8)', $map_file or die "Cannot read $map_file: $!\n";
@@ -139,6 +168,9 @@ for my $file (@files) {
   $content =~ s{\]\(([^)\s]+)\)}{'](' . normalize_local_ref($1) . ')'}ge;
   $content =~ s{href="([^"]+)"}{'href="' . normalize_local_ref($1) . '"'}ge;
   $content =~ s{href='([^']+)'}{'href="' . normalize_local_ref($1) . '"'}ge;
+
+  # Auto-embed supported video URLs.
+  $content = embed_video_urls($content);
 
   if ($content ne $original) {
     open my $out, '>', $file or die "Cannot write $file: $!";
