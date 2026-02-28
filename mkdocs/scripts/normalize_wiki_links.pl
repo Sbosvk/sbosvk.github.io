@@ -42,6 +42,32 @@ sub to_rel {
   return $rel;
 }
 
+# Convert local markdown/href targets from '*.md' to extensionless links.
+sub normalize_local_ref {
+  my ($ref) = @_;
+  return $ref unless defined $ref;
+
+  my ($path, $anchor) = split(/#/, $ref, 2);
+  return $ref unless defined $path;
+
+  # Keep external/protocol links and pure anchors untouched.
+  if ($path =~ m{^(?:[a-zA-Z][a-zA-Z0-9+.-]*:|//)} || $path =~ /^#/) {
+    return $ref;
+  }
+
+  if ($path =~ m{(^|/)index\.md$}) {
+    if ($path eq 'index.md') {
+      $path = '.';
+    } else {
+      $path =~ s{/index\.md$}{/};
+    }
+  } elsif ($path =~ /\.md$/) {
+    $path =~ s/\.md$//;
+  }
+
+  return defined($anchor) && length($anchor) ? "$path#$anchor" : $path;
+}
+
 # Build wiki-slug -> destination map from the authoritative TSV mapping.
 my %slug_to_dest;
 open my $mf, '<:encoding(UTF-8)', $map_file or die "Cannot read $map_file: $!\n";
@@ -108,6 +134,11 @@ for my $file (@files) {
       "https://github.com/MarechJ/hll_rcon_tool/wiki/$slug_full";
     }
   }ge;
+
+  # Normalize local markdown link targets and HTML hrefs.
+  $content =~ s{\]\(([^)\s]+)\)}{'](' . normalize_local_ref($1) . ')'}ge;
+  $content =~ s{href="([^"]+)"}{'href="' . normalize_local_ref($1) . '"'}ge;
+  $content =~ s{href='([^']+)'}{'href="' . normalize_local_ref($1) . '"'}ge;
 
   if ($content ne $original) {
     open my $out, '>', $file or die "Cannot write $file: $!";
